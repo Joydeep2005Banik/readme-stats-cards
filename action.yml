@@ -1,0 +1,55 @@
+name: "README Stats Cards"
+description: "Generates GitHub stats and top languages SVG cards and commits them to your profile repo"
+author: "Joydeep2005Banik"
+
+inputs:
+  username:
+    description: "GitHub username"
+    required: true
+  token:
+    description: "GitHub token"
+    required: true
+  theme:
+    description: "Card theme"
+    required: false
+    default: "tokyonight"
+  output_dir:
+    description: "Directory to save SVGs into"
+    required: false
+    default: "profile"
+  stats_options:
+    description: "Extra query params for stats card (e.g. show_icons=true&hide=issues)"
+    required: false
+    default: "show_icons=true&hide_border=true"
+  top_langs_options:
+    description: "Extra query params for top languages card (e.g. layout=compact&langs_count=8)"
+    required: false
+    default: "layout=compact&hide_border=true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate stats card
+      uses: readme-tools/github-readme-stats-action@v1
+      with:
+        card: stats
+        options: "username=${{ inputs.username }}&theme=${{ inputs.theme }}&${{ inputs.stats_options }}"
+        path: "${{ inputs.output_dir }}/stats.svg"
+        token: ${{ inputs.token }}
+
+    - name: Generate top languages card
+      uses: readme-tools/github-readme-stats-action@v1
+      with:
+        card: top-langs
+        options: "username=${{ inputs.username }}&theme=${{ inputs.theme }}&${{ inputs.top_langs_options }}"
+        path: "${{ inputs.output_dir }}/top-langs.svg"
+        token: ${{ inputs.token }}
+
+    - name: Commit cards
+      shell: bash
+      run: |
+        git config user.name "github-actions"
+        git config user.email "github-actions@users.noreply.github.com"
+        git add ${{ inputs.output_dir }}/*.svg
+        git commit -m "Update README cards" || exit 0
+        git push
