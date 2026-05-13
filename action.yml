@@ -1,22 +1,34 @@
 name: "README Stats Cards"
 description: "Generates GitHub stats and top languages SVG cards and commits them to your profile repo"
-author: "Joydeep2005Banik"
+author: "Joydeep Banik"
+
+branding:
+  icon: bar-chart-2
+  color: blue
 
 inputs:
   username:
     description: "GitHub username"
     required: true
   token:
-    description: "GitHub token"
+    description: "GitHub token (GITHUB_TOKEN or a PAT for private repo stats)"
     required: true
   theme:
-    description: "Card theme"
+    description: "Card theme (e.g. tokyonight, radical, dark, dracula)"
     required: false
     default: "tokyonight"
   output_dir:
     description: "Directory to save SVGs into"
     required: false
     default: "profile"
+  cards:
+    description: "Comma-separated list of cards to generate (stats, top-langs)"
+    required: false
+    default: "stats,top-langs"
+  commit_message:
+    description: "Custom commit message for the card update"
+    required: false
+    default: "Update README cards"
   stats_options:
     description: "Extra query params for stats card (e.g. show_icons=true&hide=issues)"
     required: false
@@ -29,8 +41,54 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Validate inputs
+      shell: bash
+      env:
+        INPUT_USERNAME: ${{ inputs.username }}
+        INPUT_THEME: ${{ inputs.theme }}
+        INPUT_CARDS: ${{ inputs.cards }}
+        INPUT_STATS_OPTS: ${{ inputs.stats_options }}
+        INPUT_LANGS_OPTS: ${{ inputs.top_langs_options }}
+      run: |
+        errors=0
+
+        if [ -z "$INPUT_USERNAME" ]; then
+          echo "::error::Input 'username' is required but was empty."
+          errors=1
+        fi
+
+        if [ -z "$INPUT_THEME" ]; then
+          echo "::error::Input 'theme' is required but was empty."
+          errors=1
+        fi
+
+        # Validate cards input contains only allowed values
+        IFS=',' read -ra CARD_LIST <<< "$INPUT_CARDS"
+        for card in "${CARD_LIST[@]}"; do
+          card="$(echo "$card" | xargs)"  # trim whitespace
+          if [ "$card" != "stats" ] && [ "$card" != "top-langs" ]; then
+            echo "::error::Invalid card type '$card'. Allowed values: stats, top-langs"
+            errors=1
+          fi
+        done
+
+        # Reject options that try to override core parameters
+        for opt_name in INPUT_STATS_OPTS INPUT_LANGS_OPTS; do
+          opt_value="${!opt_name}"
+          if echo "$opt_value" | grep -qiE '(^|&)(username|theme)='; then
+            echo "::error::'${opt_name}' must not contain 'username=' or 'theme=' — these are set via dedicated inputs."
+            errors=1
+          fi
+        done
+
+        if [ "$errors" -eq 1 ]; then
+          exit 1
+        fi
+        echo "✅ All inputs validated successfully."
+
     - name: Generate stats card
-      uses: readme-tools/github-readme-stats-action@v1
+      if: contains(inputs.cards, 'stats')
+      uses: readme-tools/github-readme-stats-action@d82657a0e215a28ec48bfc9b3987999a279f93be
       with:
         card: stats
         options: "username=${{ inputs.username }}&theme=${{ inputs.theme }}&${{ inputs.stats_options }}"
@@ -38,18 +96,44 @@ runs:
         token: ${{ inputs.token }}
 
     - name: Generate top languages card
-      uses: readme-tools/github-readme-stats-action@v1
+      if: contains(inputs.cards, 'top-langs')
+      uses: readme-tools/github-readme-stats-action@d82657a0e215a28ec48bfc9b3987999a279f93be
       with:
         card: top-langs
         options: "username=${{ inputs.username }}&theme=${{ inputs.theme }}&${{ inputs.top_langs_options }}"
         path: "${{ inputs.output_dir }}/top-langs.svg"
         token: ${{ inputs.token }}
 
-    - name: Commit cards
+    - name: Commit and push cards
       shell: bash
+      env:
+        OUTPUT_DIR: ${{ inputs.output_dir }}
+        COMMIT_MSG: ${{ inputs.commit_message }}
       run: |
-        git config user.name "github-actions"
-        git config user.email "github-actions@users.noreply.github.com"
-        git add ${{ inputs.output_dir }}/*.svg
-        git commit -m "Update README cards" || exit 0
-        git push
+        if [ ! -d ".git" ]; then
+          echo "::error::No git repository found. Did you forget to add actions/checkout@v4 before this action?"
+          exit 1
+        fi
+
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        shopt -s nullglob
+        svgs=("$OUTPUT_DIR"/*.svg)
+        if [ ${#svgs[@]} -eq 0 ]; then
+          echo "::warning::No SVG files found in '$OUTPUT_DIR'. Were the cards generated?"
+          exit 0
+        fi
+        git add "${svgs[@]}"
+
+        if git diff --cached --quiet; then
+          echo "ℹ️ No changes to commit — cards are already up to date."
+          exit 0
+        fi
+
+        git commit -m "$COMMIT_MSG"
+
+        if ! git push; then
+          echo "::error::Failed to push changes. Check that the workflow has 'contents: write' permission and the branch is not protected."
+          exit 1
+        fi
+        echo "✅ Cards committed and pushed successfully."
