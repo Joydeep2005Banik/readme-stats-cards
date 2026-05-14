@@ -8,8 +8,8 @@ A GitHub composite action that generates and commits GitHub stats and top langua
 ## Preview
 
 <p align="center">
-  <img src="https://github-readme-stats.vercel.app/api?username=Joydeep2005Banik&theme=tokyonight&show_icons=true&hide_border=true" height="200" alt="Stats Card Preview" />
-  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=Joydeep2005Banik&theme=tokyonight&layout=compact&hide_border=true" height="200" alt="Top Languages Card Preview" />
+  <img src="./asset/stats.svg" height="200" alt="Stats Card Preview" />
+  <img src="./asset/top-langs.svg" height="200" alt="Top Languages Card Preview" />
 </p>
 
 ## Prerequisites
