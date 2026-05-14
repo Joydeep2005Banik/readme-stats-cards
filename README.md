@@ -12,6 +12,10 @@ A GitHub composite action that generates and commits GitHub stats and top langua
   <img src="./asset/top-langs.svg" height="200" alt="Top Languages Card Preview" />
 </p>
 
+## Why this Action?
+
+Most stats cards rely on a hosted server re-rendering on every page load. This action generates the SVGs on a schedule and commits them directly to your repo, so they load instantly and work even if the upstream API is down.
+
 ## Prerequisites
 
 > [!IMPORTANT]
